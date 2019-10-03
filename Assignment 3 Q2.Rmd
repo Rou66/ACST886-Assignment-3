@@ -387,7 +387,20 @@ Transfer[39]
 }
 uniroot(find_policy_value,c(60000,70000))
 ```
-The new policy value at year 9 should be $67319.02.
+
+```{r}
+## check whether the new policy value will make the transfer value at year 10 zero
+find_policy_value(67319.02)
+```
+The new policy value at year 9 should be $67319.02. 
+
+##### Calcualte the change in policy value
+```{r}
+chanage_in_policy_value <- uniroot(find_policy_value,c(60000,70000))$root -VU[38]
+chanage_in_policy_value
+```
+The new policy value at year 9 is increased by 3.713458.
+
 
 #### (c) 
 The EPV of transfer decreased as a result of the zeroisation. It is becasue money has been held back in the Unit Fund at year 9 instead of releasing it to shareholders in order to give a zero transfer at year 10. Since these additional funds earn only 10% p.a. interest in the Unit Fund, whereas the discount rate is 12.5%, overall the business is now (slightly) less profitable.
