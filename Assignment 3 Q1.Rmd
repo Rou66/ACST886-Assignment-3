@@ -1,0 +1,158 @@
+---
+title: "ACST 886 Assignment 3"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 1
+#### (a)
+##### (i) Calculate profit signature 
+First step is to get the table of $q_x$, $l_x$ and $_tP_x$.
+```{r}
+### create a table
+year <- c(1,2,3,4)
+x <- c()
+x[55:58] <- c(55,56,57,58)
+qx <- c()
+qx[55:57] <- c(0.001046,0.001199,0.001375)
+# calculate lx
+lx <- c()
+lx[55] <- 100000
+dx <- c()
+
+for (j in 55:58) {
+  dx[j] <- lx[j]*qx[j]
+  lx[j+1] <- lx[j]-dx[j]
+}
+
+tpx <- c()
+for (j in 55:57) {
+  tpx[j] <- lx[j+1]/lx[55]
+}
+
+table <- cbind(year[1:4],x[55:58],qx[55:58],lx[55:58],tpx[55:58])
+colnames(table) <- c("year","x","qx","lx","tpx")
+table
+```
+Next, calculate $a_{56\,:\,\overline{2}|}$ and $a_{57\,:\,\overline{1}|}$, using the formula $a_{x\,:\,\overline{n-1}|}=\frac{v-A_{x\,:\,\overline{n}|}}{d}$
+```{r}
+### calculate ax_due
+A56_3 <- 0.889132
+A57_2 <- 0.924607
+
+i <- (1.06/1.0192308)-1
+v <- 1/(1+i)
+d <- 1-v
+
+ax_due <- c()
+ax_due[55:56] <- c((v-A56_3)/d,(v-A57_2)/d)
+ax_due[55:56]
+```
+Now, we need to create vectors for all the cash flows. We have premium, expense at the beginning of year, expense at the end of year, survival annuity. And policy value is calculated by $_{t}V_{x+t\,:\,\overline{n-t}|}=Pa_{x+t\,:\,\overline{n-t}|}$ where P is the annuity payment.
+```{r}
+## vectors for all cash flows
+premium <- c()
+premium[55:57] <- c(40250,0,0)
+
+expense_BOY <- c()
+expense_BOY[55:57] <- c(100+0.015*40250,0,0)
+
+expense_EOY <- c()
+expense_EOY[55:57] <- c(10,10*1.05,10*1.05^2)
+
+annuity_EOY <- c()
+annuity_EOY[55:57] <- c(15000,15000*1.0192308,15000*1.0192308^2)
+
+## policy values
+policy_EOY <- c()
+policy_EOY[55:56] <- annuity_EOY[55:56]*ax_due[55:56]
+policy_EOY[57] <- 0
+
+## Create a cashflow table
+cashflow <- cbind(year[1:3],x[55:57],premium[55:57],expense_BOY[55:57],
+                  expense_EOY[55:57],annuity_EOY[55:57],policy_EOY[55:57])
+colnames(cashflow) <- c("year","x","Premium","Expense_BOY",
+                        "Expense_EOY","Annuity_EOY","Policy_EOY")
+cashflow
+```
+
+Now we can calculate the expected cash flows and hence the profit signature.
+```{r}
+## all the expected cash flows
+exp_premium <- c()
+exp_premium[55:57] <- premium[55:57]
+
+exp_expense_BOY <- c()
+exp_expense_BOY[55:57] <- c(100+0.015*40250,0,0)
+
+exp_expense_EOY <- c()
+exp_expense_EOY[55:57] <- tpx[55:57]*c(10,10*1.05,10*1.05^2)
+
+exp_annuity_EOY <- c()
+exp_annuity_EOY[55:57] <- tpx[55:57]*c(15000,15000*1.0192308,15000*1.0192308^2)
+
+## expected policy values
+exp_policy_EOY <- c()
+exp_policy_EOY[55:56] <- tpx[55:56]*policy_EOY[55:56]
+exp_policy_EOY[57] <- 0
+exp_policy_EOY[54] <- 0
+
+## expected interest 
+## earned interest rate is 8%
+exp_interest_EOY <- c()
+for (j in 55:57) {
+  exp_interest_EOY[j] <- (exp_policy_EOY[j-1]+exp_premium[j]-exp_expense_BOY[j])*0.08
+}
+
+## profit signature
+transfer <- c()
+for (j in 55:57) {
+  transfer[j] <- exp_policy_EOY[j-1]+exp_premium[j]-exp_expense_BOY[j]-
+                 exp_expense_EOY[j]-exp_annuity_EOY[j]+exp_interest_EOY[j]-
+                 exp_policy_EOY[j]
+}
+
+## a table for all expected cash flows
+exp_cashflow <- cbind(year[1:3],x[55:57],exp_premium[55:57],exp_expense_BOY[55:57],
+                  exp_expense_EOY[55:57],exp_annuity_EOY[55:57],exp_interest_EOY[55:57],
+                  exp_policy_EOY[55:57],transfer[55:57])
+colnames(exp_cashflow) <- c("year","x","Exp_Premium","Exp_Expense_BOY",
+                        "Exp_Expense_EOY","Exp_Annuity_EOY","Exp_Interest",
+                        "Policy_EOY","Transfer")
+exp_cashflow
+```
+The profit signature is the transfer vector.
+
+##### (ii) Measure profitability
+Since there is only one initial payment of premium, the NPV of premium is just 40250.
+Now calculate the NPV of profit signature.
+```{r}
+## risk discount rate is 12%
+i <- 0.12
+EPV_Transfers <- sum(transfer[55:57]/(1+i)^(1:3))
+EPV_Transfers
+```
+Profit margin is calculated by $\frac{EPV(profits)}{EPV(premiums)}$.
+```{r}
+EPV_Premiums <- sum(exp_premium[55:57]/(1+i)^(0:2))
+profit_margin <- EPV_Transfers/EPV_Premiums
+profit_margin
+```
+The profit margin is around 0.5%.
+
+#### (b) IRR
+The uniroot function will be used to find the internal rate of return. First we need to create a NPV function in terms of IRR and set NPV to zero to get the required IRR.
+```{r}
+## create a EPV function in terms of IRR
+EPV <- function(irr){
+  EPV <- sum(transfer[55:57]/(1+irr)^(1:3))
+  return(EPV)
+}
+## find the IRR 
+uniroot(EPV,c(0.4,0.6))
+```
+The internal rate of return is approximately 50%. We can see that the expected transfer has a large negative value at the first year and followed by two postive values. If we want the NPV of the transfer to be zero, we have to have a large rate to discount back the cash flow.
+
